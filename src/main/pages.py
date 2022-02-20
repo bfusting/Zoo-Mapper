@@ -35,7 +35,6 @@ import shlex
 
 from tksheet import Sheet
 from heatmappage import HeatMapPage
-from heatmappage import StartPage
 import csv
 
 LARGE_FONT = ("Bell Gothic Std Black", 40, 'bold')
