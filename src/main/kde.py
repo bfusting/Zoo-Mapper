@@ -63,7 +63,7 @@ class KDE_Page(tk.Frame):
         file_type = self.filename[self.filename.index('.'):]
         if file_type == ".xlsx":
             validFile = True
-	if file_type == ".csv":
+        elif file_type == ".csv":
             validFile = True
         else:
             errorMessage(Error.FILETYPE)
