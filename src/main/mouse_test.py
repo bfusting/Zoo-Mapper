@@ -47,7 +47,7 @@ root.geometry('400x300')
 
 img_label=Label(bd=0)
 img_label.pack()
-image=Image.open('enclosure.jpg')
+image=Image.open('C:\\Users\\colli\\Code\\ZooMapper\\Zoo-Mapper\\src\main\\enclosure.jpg')
 photoimage=ImageTk.PhotoImage(image.resize((100,100),Image.ANTIALIAS))
 img_label.config(image=photoimage)
 Resizable(img_label,image)

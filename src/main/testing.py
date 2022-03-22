@@ -6,15 +6,15 @@ from matplotlib.pyplot import text
 
 
 class Resizable:
-    def __init__(self,label,image):
-        self.label=label
+    def __init__(self,canvas,image):
+        self.canvas=canvas
         self.image=image
-        self.label.master.bind('<Motion>',self.position)        
+        self.canvas.master.bind('<Motion>',self.position)        
         self.flag=False 
 
     def position(self,event):
         #print("resizing")
-        self.dimentions=(self.label.winfo_width(),self.label.winfo_height())
+        self.dimentions=(self.canvas.winfo_width(),self.canvas.winfo_height())
         self.x,self.y = event.x,event.y
         if (
             self.x in range (self.dimentions[0]-10,self.dimentions[0] + 10,1) and 
@@ -45,6 +45,7 @@ class Resizable:
             self.label.config(image=self.photoimage)
             self.label.update()
             self.label.after(1,self.resize)
+            self.canvas.create_image()
 
 class Move:
    def __init__(self, canvas) -> None:
