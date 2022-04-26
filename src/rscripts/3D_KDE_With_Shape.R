@@ -121,6 +121,23 @@ KDETrialDouble <- function(data1, data2, if2D, percs, m, n, pilot, imgDir, color
     vols <- append(vols, calcKernelVol(fhat1, perc))
     vols <- append(vols, calcKernelVol(fhat2, perc))
     vols <- append(vols, calcIntersect(fhat1, fhat2, perc)) }
+  
+  #convert kde to shp file
+  spkde <- image2grid(list(x = fhat$eval.points[[1]], 
+                           y = fhat$eval.points[[2]],
+                           z = fhat$estimate))
+  
+  countour(spkde, add = TRUE)
+  
+  r <- raster(spkde)
+  r.cont <- rasterToContour(r, nlevels = 20)
+  #shapefile(r.cont, filename= 'shapefilename', overwrite=FALSE)
+  
+ ## or alternatively
+  #writeLinesShape(r.cont, "(shapefilename")
+  
+  #END CONVERT TO SHAPEFILE
+  
   return(vols) }
 
 KDESingle <- function(data, if2D, percs, ms, ns, pilots, imgDir, colorSingle, opacitySingle, display2D) { # Performs KDE for single volume with all combinations of settings
