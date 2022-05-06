@@ -132,7 +132,12 @@ prepData <- function(raw, name, nameCol, xCol, yCol, zCol, zIncr, ifNoise, if2D)
   return(data) }
 
 run <- function(path, sheet, nameCol, xCol, yCol, zCol, dir, out_file, excluded, zIncr, ifNoise, ifSingle, ifDouble, if2D, percs, ms, ns, pilots, colorSingle, colorDouble1, colorDouble2, opacitySingle, opacityDouble1, opacityDouble2, display2D) { # Runs program
-  raw <- read_excel(path, sheet=sheet)
+  if(grepl(".csv", path, fixed=TRUE)){
+    raw <- read_csv(path)
+  }
+  else{
+    raw <- read_excel(path, sheet=sheet)
+  }
   names <- unique(raw[nameCol]) # Get unique names for iterating
   colnames(excluded) <- nameCol # Rename columns for processing
   names <- anti_join(names, excluded, by=nameCol) # Remove excluded from names
