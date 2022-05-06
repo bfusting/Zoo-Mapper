@@ -439,7 +439,7 @@ class ZooMapper(tk.Tk):
                     wb_active.delete_rows(delete_list[temp_length - 1])
                     del delete_list[temp_length - 1]
                     safety_counter = safety_counter + 1
-                    if safety_counter >= 999:
+                    if safety_counter >= 99999:
                         break
                 
                 wb.save(temp_filename)
