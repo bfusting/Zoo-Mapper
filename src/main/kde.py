@@ -3,7 +3,8 @@ import tkinter as tk
 from tkinter import ttk
 from tkinter import *
 from tkinter import filedialog
-from numpy import true_divide
+from tokenize import Double
+from numpy import double, true_divide
 import pandas as pd
 import rpy2.robjects as robjects
 from rpy2.robjects import NULL, pandas2ri
@@ -15,6 +16,9 @@ import csv
 import subprocess
 import multiprocessing
 import threading
+import re
+import json
+import os
 
 import heatmappage
 
@@ -23,6 +27,7 @@ MEDIUM_FONT = ("Bell Gothic Std Black", 25, 'bold')
 BUTTON_FONT = ('Calibiri', 14, 'bold')
 BACKGROUND_COLOR = '#407297'
 LIGHT_BLUE = '#d4e1fa'
+JSON_PATH = os.getcwd() + '/kde_args.json'
 
 
 """
@@ -65,9 +70,9 @@ class KDE_Page(tk.Frame):
             validFile = True
         if file_type == ".csv":
             validFile = True
-        else:
-            errorMessage(Error.FILETYPE)
-            self.filename = ""
+        # else:
+        #     errorMessage(Error.FILETYPE)
+        #     self.filename = ""
 
 
     def get_parameters(self):
@@ -105,12 +110,10 @@ class KDE_Calculation_Page(tk.Toplevel):
         self.dscalar.set(False)
         self.dunconstr = tk.BooleanVar()
         self.dunconstr.set(False)
-        self.contour_50 = tk.BooleanVar()
-        self.contour_50.set(False)
-        self.contour_95 = tk.BooleanVar()
-        self.contour_95.set(False)
-        self.contour_100 = tk.BooleanVar()
-        self.contour_95.set(False)
+        self.enclosure_depth = tk.StringVar()
+        self.enclosure_depth.set('1.0')
+        self.depth_sections = tk.StringVar()
+        self.depth_sections.set('1.0')
 
 
         self.filename.set(filename)
@@ -159,21 +162,27 @@ class KDE_Calculation_Page(tk.Toplevel):
         dunconstr_checkbox = tk.Checkbutton(self, text='dunconstr', variable=self.dunconstr)
         dunconstr_checkbox.pack()
 
-        # Select contours
-        contours_label = tk.Label(self, text = "Select Contours", bg='white')
+        # # Select contours
+        contours_label = tk.Label(self, text = "Input Contours", bg='white')
         contours_label.pack()
-        c50_checkbox = tk.Checkbutton(self, text='50%', variable=self.contour_50)
-        c50_checkbox.pack()
-        c95_checkbox = tk.Checkbutton(self, text='95%', variable=self.contour_95)
-        c95_checkbox.pack()
-        c100_checkbox = tk.Checkbutton(self, text='100%', variable=self.contour_100)
-        c100_checkbox.pack()
-
+        self.contours_textbox = tk.Text(self, height=1, width=20)
+        self.contours_textbox.pack()
+        
         is_2d_checkbox = tk.Checkbutton(self, text="Check here if data is 2D", variable=self.is_2d)
         is_2d_checkbox.pack()
 
         noise_checkbox = tk.Checkbutton(self, text='Add noise to data?', variable=self.noise)
         noise_checkbox.pack()
+
+        depth_sections_label = tk.Label(self, text = "Number of Depth Sections", bg='white')
+        depth_sections_label.pack()
+        self.depth_sections_textbox = tk.Text(self, height=1, width=20)
+        self.depth_sections_textbox.pack()
+
+        depth_label = tk.Label(self, text="Enclosure Depth", bg='white')
+        depth_label.pack()
+        self.depth_textbox = tk.Text(self, height=1, width=20)
+        self.depth_textbox.pack()
        
         tmp_button = tk.Button(self, text="Run KDE",
                                 command=lambda: self.run_kde())
@@ -206,32 +215,61 @@ class KDE_Calculation_Page(tk.Toplevel):
         validFile = False
         self.outputname = filedialog.askdirectory(title = "Select a Directory for Output")
 
+    def get_contours(self):
+        contours = self.contours_textbox.get(1.0, "end")
+        contours = re.sub(","," ", contours)
+        contours = re.sub("\s+", " ", contours)
+        contours = re.sub("\s+\Z", "", contours)
+        contours = re.split("\s", contours)
+
+        contour_ints = []
+
+        for c in contours:
+            contour_ints.append(int(c))
+
+        return contour_ints
+
+    def set_enclosure_depth(self):
+        self.enclosure_depth.set(self.depth_textbox.get(1.0, "end"))
+    
+    def set_depth_sections(self):
+        self.depth_sections.set(self.depth_sections_textbox.get(1.0, "end"))
+
+    # TODO: add contours and output path do dict
+    def get_kde_args_dict(self) -> dict:
+        kde_args = {}
+
+        kde_args['filename'] = self.filename.get()
+        kde_args['is2d'] = self.is_2d.get()
+        kde_args['name_col'] = self.name_col.get()
+        kde_args['x_col'] = self.x_col.get()
+        kde_args['y_col'] = self.y_col.get()
+        kde_args['z_col'] = self.z_col.get()
+        kde_args['noise'] = self.noise.get()
+        kde_args['m'] = self.m.get()
+        kde_args['n'] = self.n.get()
+        kde_args['samse'] = self.samse.get()
+        kde_args['unconstr'] = self.unconstr.get()
+        kde_args['dscalar'] = self.dscalar.get()
+        kde_args['dunconstr'] = self.dunconstr.get()
+        kde_args['enclosure_depth'] = self.enclosure_depth.get()
+        kde_args['depth_sections'] = self.depth_sections.get()
+        kde_args['output_dir'] = self.outputname
+        kde_args['cs'] = self.get_contours()
+
+
+        return kde_args
+
     def run_kde(self):
-        # r = robjects.r
-        # r['source']('C:/Users/Kevin/Documents/GitHub/Zoo-Mapper/src/rscripts/3D_KDE_2021.R')
 
-        #run output file selection before KDE R Script
         self.select_output()
-        print(self.outputname)
 
-        print(self.m.get())
-        subprocess.call(['Rscript', 'src/rscripts/3D_KDE_2021.R',
-                        self.filename.get(), self.bool_to_str(self.is_2d.get()), 
-                                                                self.name_col.get(),
-                                                                self.x_col.get(),
-                                                                self.y_col.get(),
-                                                                self.z_col.get(),
-                                                                self.bool_to_str(self.noise.get()),
-                                                                str(self.m.get()),
-                                                                str(self.n.get()),
-                                                                self.bool_to_str(self.contour_50.get()),
-                                                                self.bool_to_str(self.contour_95.get()),
-                                                                self.bool_to_str(self.contour_100.get()),
-                                                                self.bool_to_str(self.samse.get()),
-                                                                self.bool_to_str(self.unconstr.get()),
-                                                                self.bool_to_str(self.dscalar.get()),
-                                                                self.bool_to_str(self.dunconstr.get()),
-                                                                self.outputname])
+        kde_args = self.get_kde_args_dict()
+        with open(JSON_PATH, "w") as outfile:
+            json.dump(kde_args, outfile)
 
+        subprocess.call(['Rscript', 'src/rscripts/3D_KDE_2021.R', JSON_PATH])
+
+        # # Alert user that calculations are done
         messagebox.showinfo("Complete", "KDE calculations are complete")
 

@@ -4,3 +4,4 @@ _pycache__/
 *.pyc
 .idea/misc.xml
 saves
+*.vscode

@@ -6,13 +6,10 @@ library (readxl)
 library (dplyr)
 library (htmlwidgets)
 library(ggplot2)
+library(rjson)
 
 pandoc_path <- Sys.getenv("RSTUDIO_PANDOC")
-print("PANDOC PATH BELOW")
-print(pandoc_path)
 Sys.setenv(RSTUDIO_PANDOC="C:/Program Files/RStudio/bin/pandoc")
-#Sys.setenv(RSTUDIO_PANDOC="./pandoc")
-#Sys.setenv(RSTUDIO_PANDOC=pandoc_path)
 
 options(stringsAsFactors = FALSE)
 
@@ -55,6 +52,7 @@ KDETrialSingle <- function(data, if2D, percs, m, n, pilot, imgDir, colorSingle, 
   if(if2D) { # Create and save 2D plot
     imgName <- paste(imgDir,"/",genLabel(m,n,pilot),".png",sep="")
     png(imgName)
+    print(paste("imgName", imgName, sep=" "))
     plot(fhat, display=display2D, cont=percs, asp=1, col=colorSingle)
     dev.off()
   }
@@ -79,6 +77,7 @@ KDETrialDouble <- function(data1, data2, if2D, percs, m, n, pilot, imgDir, color
   if(typeof(fhat1$x) == "list") { fhat1$x  <- data.matrix(fhat1$x) }
   fhat2 <- kde(data2, H=band2, xmin=bounds[1:dims], xmax=bounds[(dims+1):(dims*2)])
   if(typeof(fhat2$x) == "list") { fhat2$x  <- data.matrix(fhat2$x) }
+  # handle 3D
   if(!if2D) {
     imgName <- paste(imgDir,"/",genLabel(m,n,pilot),".html",sep="")
     plot(fhat1, display="rgl", cont=percs, asp=1, col=colorDouble1, alpha=opacityDouble1)
@@ -86,6 +85,14 @@ KDETrialDouble <- function(data1, data2, if2D, percs, m, n, pilot, imgDir, color
     scene <- scene3d()
     saveWidget(rglwidget(scene), file=imgName)
     rgl.close() }
+  # handle 2D
+  else{
+    imgName <- paste(imgDir, "/", genLabel(m,n,pilot), ".png", sep="")
+    png(imgName)
+    plot(fhat1, display=display2D, cont=percs, asp=1, col=colorDouble1, alpha=0.5)
+    plot(fhat2, display=display2D, cont=percs, asp=1, add=TRUE, col=colorDouble2, alpha=0.5)
+    dev.off()
+  }
   vols <- vector()
   for(perc in percs) {
     vols <- append(vols, calcKernelVol(fhat1, perc))
@@ -128,6 +135,7 @@ prepData <- function(raw, name, nameCol, xCol, yCol, zCol, zIncr, ifNoise, if2D)
     data <- select(data, xCol, yCol, zCol) # Select coordinate columns as X,Y,Z
     colnames(data) <- c("X", "Y", "Z") } # Rename columns to X,Y,Z
   data <- na.omit(data) # Remove rows with missing data
+  # Adding noise here. runif(n, min, max) produces a uniform sample of size n between the values of min and max
   if(ifNoise & !if2D) { data[,3] <- data[,3] + runif(nrow(data), -zIncr, 0) } # Add noise to Z
   return(data) }
 
@@ -163,28 +171,28 @@ run <- function(path, sheet, nameCol, xCol, yCol, zCol, dir, out_file, excluded,
         volumes <- KDEDouble(data1, data2, if2D, percs, ms, ns, pilots, imgDir, colorDouble1, colorDouble2, opacityDouble1, opacityDouble2, display2D)
         print(paste(tag,":",sep=""))
         print(volumes)
-        out_file_name = paste(dir, (paste(name, "output.csv", sep="-")), sep="\\")
+        out_file_name = paste(dir, (paste(name1, name2, "output.csv", sep="-")), sep="\\")
         write.table(volumes, out_file_name, row.names=TRUE, sep=", ", col.names=TRUE, quote=TRUE, na="NA")
         }}}}
 
-# Set Parameters
 
 ## Data Parameters
+
+# args[1] is the JSON path
+args = commandArgs(trailingOnly=TRUE)
+print(args)
+
+#Use the next line to hardcode path if line below it is causing problems
+# params <- fromJSON(file="C:/Users/Kevin/Documents/Git/Zoo-Mapper/kde_args.json")
+params <- fromJSON(file = args[1])
+
 # path <- "C:/Users/Kevin/Documents/CISC498/Sample Data for 3D Distances.xlsx"        # Path of data
  sheet <- 1                                                            # Sheet number (starts at 1) 
-# nameCol <- "Focal_Shar"                                               # Name column
-# xCol <- "LongUTM"                                                     # X-coordinate column
-# yCol <- "LatUTM"                                                      # Y-coordinate column
-# zCol <- "DepthM"                                                      # Z-coordinate column
-
-# Output
-#out_file <- "C:/Users/Kevin/Documents/R/output.csv"
 
 ## Processing Parameters
-#dir <- choose.dir(caption="Choose an output directory")  
 # OUTPUT NOW COMES FROM PYTHON CALL
-args = commandArgs(trailingOnly=TRUE)            
-dir <- toString(args[17])
+# args = commandArgs(trailingOnly=TRUE)            
+dir <- params$output_dir
 out_file <- paste(dir, "output.csv", sep="\\")                                     # Output directory
 # out_file <- paste(dir, "/output.csv")
 # dir <- file.choose()
@@ -193,14 +201,6 @@ excluded <- data.frame(c("Calibration"))                              # Names to
 ifNoise <- TRUE                                                      # Controls if there is noise added
 ifSingle <- TRUE                                                      # Controls if the single-entity KDEs are done
 ifDouble <- TRUE                                                      # Controls if the double-entity KDEs are done
-# if2D <- FALSE                                                         # Controls if the analysis is 2D or 3D
-
-## Analysis Parameters
-#percs <- c(50, 95, 100)                                                     # Contour percentages
-#ms <- c(5)                                                          # Scaling factors for bandwidth
-#ns <- c(1)                                                            # Number of stages in bandwidth optimization (1, 2)
-#pilots <- c("samse", "unconstr", "dscalar", "dunconstr")              # Strategy for bandwidth optimization (samse, unconstr, dscalar, dunconstr)
-# pilots <- c("samse")
 
 ## Display Parameters                                                 # Lengths should match length of percs
 colorSingle <- c("red", "black")                                      # Colors for single-entity KDEs
@@ -211,33 +211,37 @@ opacityDouble1 <- c(0.25, 0.50, 0.95)                                       # Op
 opacityDouble2 <- c(0.25, 0.50, 0.95)                                       # Opacities for second entity of 3D double-entity KDEs
 display2D <- "filled.contour"                                         # Plot type for 2D (filled.contour, slice, persp, image)
 
-print("IN 3D_KDE_2021")
-
 #moved args assignment to assignment or DIR for the python menu implementation
 #args = commandArgs(trailingOnly=TRUE)
 
-path <- toString(args[1])
-if2D <- (args[2] == "t")
-nameCol <- toString(args[3])
-xCol <- toString(args[4])
-yCol <- toString(args[5])
-zCol <- toString(args[6])
-ifNoise <= (args[7] == "t")
-ms <- as.integer(args[8])
-ns <- as.integer(args[9])
-contour_50 <- (args[10]=="t")
-contour_95 <- (args[11]=="t")
-contour_100 <- (args[12]=="t")
-samse <- (args[13]=="t")
-unconstr <- (args[14]=="t")
-dscalar <- (args[15]=="t")
-dunconstr <- (args[16]=="t")
+# Set static args
+path <- params$filename
+if2D <- params$is2d
+nameCol <- params$name_col
+xCol <- params$x_col
+yCol <- params$y_col
+zCol <- params$z_col
+ifNoise <- params$noise
+ms <- params$m
+ns <- params$n
+samse <- params$samse
+unconstr <- params$unconstr
+dscalar <- params$dscalar
+dunconstr <- params$dunconstr
+enclosure_depth <- as.integer(params$enclosure_depth)
+depth_sections <- as.integer(params$depth_sections)
 
+# Set contours (percs)
+percs <- params$cs
 
+# Determining depth section height
+# Currently, heights are marked as the top of a section, so the range between the max and min
+# depth values goes from the top of the highest section to the top of the lowest section.
+# The range of the bottom section is not included, so we subtract 1 from section count
+# when finding heights of individual sections below
 
-zIncr <- max(read_excel(path)[zCol]) - min(read_excel(path)[zCol])
-print("Z Range")
-print(zIncr)
+zIncr <- enclosure_depth / depth_sections
+
 
 pilots <- c()
 if(samse){
@@ -252,28 +256,6 @@ if(dscalar){
 if(dunconstr){
   pilots <- c(pilots, "dunconstr")
 }
-
-
-percs <- c()
-if(contour_50){
-  percs <- c(percs, 50)
-}
-if(contour_95){
-  percs <- c(percs, 95)
-}
-if(contour_100){
-  percs <- c(percs, 100)
-}
-
-
-
-#path <- ("C:/Users/Kevin/Documents/CISC498/Sample Test Calculations/Mid depth vs top depth 2D and 3D test calculations.xlsx")
-#sheet <- 4
-#if2D <- FALSE
-#nameCol <- "Focal_Shar"
-#xCol <- "LongUTM"
-#yCol <- "LatUTM"
-#zCol <- "DepthMid"
 
 # Run Program
 run(path, sheet, nameCol, xCol, yCol, zCol, dir, out_file, excluded, zIncr, ifNoise, ifSingle, ifDouble, if2D, percs, ms, ns, pilots, colorSingle, colorDouble1, colorDouble2, opacitySingle, opacityDouble1, opacityDouble2, display2D)
