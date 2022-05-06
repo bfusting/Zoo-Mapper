@@ -77,14 +77,26 @@ KDETrialSingle <- function(data, if2D, percs, m, n, pilot, imgDir, colorSingle, 
   for(perc in percs) { vols <- append(vols, calcKernelVol(fhat,perc)) } # Store calculated volumes
   
   #convert kde to shp file
-  spkde <- image2grid(list(x = fhat$eval.points[[1]], 
-                           y = fhat$eval.points[[2]],
-                           z = fhat$estimate))
+  #spkde <- image2grid(list(x = fhat$eval.points[[1]], 
+  #                         y = fhat$eval.points[[2]],
+  #                         z = fhat$estimate))
   
-  countour(spkde, add = TRUE)
+  #countour(spkde, add = TRUE)
   
-  r <- raster(spkde)
-  r.cont <- rasterToContour(r, nlevels = 20)
+  #r <- raster(spkde)
+  #r.cont <- rasterToContour(r, nlevels = 20)
+  r <- raster(extent(0,12,0,11), nrows=nrow(fhat$estimate), ncols=ncol(fhat$estimate))  
+  r[] <- fhat$estimate
+  r <- flip(r, direction='y')
+  rcont <- rasterToContour(r, levels = fhat$cont)
+  ( cont.values <- fhat$cont[grep(paste(c("50","75","95"), collapse = "|"), 
+                                   names(fhat$cont))] )
+  rcont.gt50 <- rcont[which(rcont@data[,1] %in% cont.values),]
+  
+  
+  
+  shapefile(rcont.gt50, filename= 'shapefilename', overwrite=FALSE)
+  
   
   #shapefile(r.cont, filename= 'shapefilename', overwrite=FALSE)
   
@@ -123,18 +135,17 @@ KDETrialDouble <- function(data1, data2, if2D, percs, m, n, pilot, imgDir, color
     vols <- append(vols, calcIntersect(fhat1, fhat2, perc)) }
   
   #convert kde to shp file
-  spkde <- image2grid(list(x = fhat$eval.points[[1]], 
-                           y = fhat$eval.points[[2]],
-                           z = fhat$estimate))
+  r <- raster(extent(0,12,0,11), nrows=nrow(fhat1$estimate), ncols=ncol(fhat1$estimate))  
+  r[] <- fha1t$estimate
+  r <- flip(r, direction='y')
+  rcont <- rasterToContour(r, levels = fhat$1cont)
+  ( cont.values <- fha1t$cont[grep(paste(c("50","75","95"), collapse = "|"), 
+                                   names(fhat1$cont))] )
+  rcont.gt50 <- rcont[which(rcont@data[,1] %in% cont.values),]
   
-  countour(spkde, add = TRUE)
   
-  r <- raster(spkde)
-  r.cont <- rasterToContour(r, nlevels = 20)
-  #shapefile(r.cont, filename= 'shapefilename', overwrite=FALSE)
   
- ## or alternatively
-  #writeLinesShape(r.cont, "(shapefilename")
+  shapefile(rcont.gt50, filename= 'shapefilename', overwrite=FALSE)
   
   #END CONVERT TO SHAPEFILE
   
