@@ -10,6 +10,7 @@ import scipy.spatial as ss
 import PIL.Image
 from PIL import ImageTk
 import math
+import shutil
 
 from errors import *
 import time
@@ -41,6 +42,8 @@ import tkinter as tk
 from tkinter import ttk
 from tkinter import filedialog
 from tkinter import messagebox
+import openpyxl
+from openpyxl import load_workbook, Workbook
 
 import os
 import json
@@ -118,6 +121,9 @@ class ZooMapper(tk.Tk):
 
         file_menu.add_command(label='Import Spreadsheet',
                               command=self.get_spreadsheet)
+
+        file_menu.add_command(label='Reduce Spreadsheet',
+                              command=self.reduce_spreadsheet)
 
         # file_menu.add_command(label="Import Habitat", command=self.get_image)
 
@@ -351,6 +357,162 @@ class ZooMapper(tk.Tk):
 
                 break
 
+    def reduce_spreadsheet(self, saved_import=None):
+        """
+        Opens file explorer to select a spreadsheet and creates a copy where each SessionID will have
+        the same number of entries.
+        """
+
+        if hasattr(self, 'sheet'):
+            self.sheet.close(self)
+
+        validFile = False
+        self.sheet_choice = ''
+
+        while validFile == False:
+            try:
+
+                if saved_import == None:
+                    filename = filedialog.askopenfilename(initialdir=''
+                            , title='Select a File',
+                            filetypes=(('Excel files', '*.xlsx*'),
+                            ('CSV files', '*.csv*'), ('all files', '*.*'
+                            )))
+                else:
+                    filename = saved_import['spreadsheet_path']
+                    self.sheet_choice = saved_import['sheet_name']
+
+                self.spreadsheet_path = filename
+
+                file_type = filename[filename.index('.'):]
+
+                data = None
+                
+                temp_filename = filename
+                temp_filename.replace('.xlsx', '')
+                temp_filename = temp_filename + '_Reduced.xlsx'
+                shutil.copyfile(filename, temp_filename)
+
+                wb = Workbook()
+                wb = openpyxl.load_workbook(temp_filename)
+                wb_active = wb.active
+
+                total_min = 99
+                record_counter = 0
+                row_number = 0
+                temp_cell = 0
+
+                # Gets the lowest number for records at or above 3.
+                for row in wb_active:
+                    row_number = row_number + 1
+                    if row_number != 1:
+                        for cell in row:
+                            if cell.value == temp_cell:
+                                record_counter = record_counter + 1
+                            if cell.value != temp_cell:
+                                if record_counter >= 3:
+                                    if record_counter < total_min:
+                                        total_min = record_counter
+                                        record_counter = 0
+                            temp_cell = cell.value
+                            break
+                
+                delete_list = []
+                row_number = 0
+                record_counter = 0
+                for row in wb_active:
+                    row_number = row_number + 1
+                    if row_number != 1:
+                        for cell in row:
+                            if cell.value == temp_cell:
+                                record_counter = record_counter + 1
+                            if cell.value != temp_cell:
+                                record_counter = 0
+                            if record_counter >= total_min:
+                                # watch for errors here
+                                delete_list.append(row_number)
+                            temp_cell = cell.value
+                            break
+                safety_counter = 0
+                while len(delete_list) > 0:
+                    temp_length = len(delete_list)
+                    wb_active.delete_rows(delete_list[temp_length - 1])
+                    del delete_list[temp_length - 1]
+                    safety_counter = safety_counter + 1
+                    if safety_counter >= 999:
+                        break
+                
+                wb.save(temp_filename)
+
+
+
+                # Here the file type choice is accounted for, as well as the error of an incorrect file choice but it is not handled, we need to do this.
+                
+                if file_type == '.xlsx':
+
+                    data = pd.read_excel(filename, sheet_name=None)
+                    xl_data = pd.ExcelFile(filename)
+
+                    if len(xl_data.sheet_names) > 1:
+
+                        # data.parse(self.sheet_choice)
+                        # parent.sheet_name = self.sheet_choice
+
+                        if saved_import == None:
+                            popup = tk.Toplevel(self)
+                            choice_window = Sheet_Entry(self, popup,
+                                    xl_data.sheet_names)
+                            choice_window.dr.wait_window(choice_window.dr)
+
+                        if self.sheet_choice != '':
+                            data = pd.read_excel(filename,
+                                    sheet_name=self.sheet_choice)
+
+                        if self.sheet_choice is not None:
+                            self.selected_sheet = True
+                            validFile = True
+                    else:
+                        data = pd.read_excel(filename, sheet_name=0)
+                        validFile = True
+                        self.selected_sheet = True
+                        self.submit_selection = True
+                        self.sheet_choice = '0'
+
+                    if self.selected_sheet:
+
+                        # data = pd.read_excel(filename, sheet_name=self.sheet_index)
+
+                        validFile = True
+                elif file_type == '.csv':
+                    data = pd.read_csv(filename)
+                    validFile = True
+                    self.selected_sheet = True
+                else:
+                    errorMessage(Error.FILETYPE)
+                    break
+
+                if self.selected_sheet and self.sheet_choice != '':
+
+                    global heatmap_options
+
+                    heatmap_options = \
+                        self.get_plot_creation_options(data,
+                            saved_import=saved_import)
+                    self.df = data
+
+                    if heatmap_options != None:
+                        global heat_frame
+                        heat_frame = HeatMapPage(self.container_please,
+                                self, data, heatmap_options)
+                        heat_frame.config(bg=LIGHT_BLUE)
+                        heat_frame.grid(row=0, column=0, sticky='nsew')
+                        self.frames[HeatMapPage] = heat_frame
+                        
+            except ValueError:
+                
+
+                break
+
     def update_graph(self, sheet=None, saved_import=None):
         """
         Updates the displayed graph with the newest available dataframe
@@ -418,6 +580,7 @@ Jake Wise
 Yuzu Wu
 Michael Yacucci
 Shuobofang Yang
+Arthur Marino
 ''')
 
     def show_frame(self, cont):
