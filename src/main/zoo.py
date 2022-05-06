@@ -450,8 +450,8 @@ class ZooMapper(tk.Tk):
                 
                 if file_type == '.xlsx':
 
-                    data = pd.read_excel(filename, sheet_name=None)
-                    xl_data = pd.ExcelFile(filename)
+                    data = pd.read_excel(temp_filename, sheet_name=None)
+                    xl_data = pd.ExcelFile(temp_filename)
 
                     if len(xl_data.sheet_names) > 1:
 
@@ -465,14 +465,14 @@ class ZooMapper(tk.Tk):
                             choice_window.dr.wait_window(choice_window.dr)
 
                         if self.sheet_choice != '':
-                            data = pd.read_excel(filename,
+                            data = pd.read_excel(temp_filename,
                                     sheet_name=self.sheet_choice)
 
                         if self.sheet_choice is not None:
                             self.selected_sheet = True
                             validFile = True
                     else:
-                        data = pd.read_excel(filename, sheet_name=0)
+                        data = pd.read_excel(temp_filename, sheet_name=0)
                         validFile = True
                         self.selected_sheet = True
                         self.submit_selection = True
